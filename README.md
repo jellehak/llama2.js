@@ -14,16 +14,16 @@ A pure JavaScript port of Karpathy's [llama2.c](https://github.com/karpathy/llam
     wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories42M.bin
     wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories110M.bin
     ```
-2. Run llama2.html via a WebServer
+2. Open run.html via a WebServer
    
    ```bash
     python -m http.server 8080
-    open http://localhost:8080/llama2.html
+    open http://localhost:8080/run.html
     ```
 
 ## Performance
 
-Tokens/sec measurement on iMac M1
+Tokens/sec measurement on Apple M1
 
 |    tok/s   | 15M | 42M | 110M |
 |-------|-----|-----|-----|
