@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
+<!-- https://github.com/karpathy/llama2.c#notable-forks -->
 <title>llama2.js</title>
 <style>
     body {
@@ -26,7 +27,8 @@
             <option value="stories110m">stories110m</option>
         </select>
 
-        <label>temperature</label><input id="temperature" type="number" value="0.9">
+        <label>top-p</label><input id="top-p" type="number" value="1.0" step="0.1">
+        <label>temperature</label><input id="temperature" type="number" value="0.9" step="0.1">
         <label>steps</label><input id="steps" type="number" value="100">
         <button id="run">run</button>
     </div>
@@ -34,6 +36,9 @@
     <p><span>achieved tok/s: </span><span id="toks"></span></p>
 </body>
 <script>
+    // About this code
+    // This is a JavaScript port of llama2.c, a tiny neural net language model
+
     let config, vocab, vocab_scores, weights, run_state;
     let is_generating = false;
 
@@ -379,6 +384,48 @@
         return n - 1; // in case of rounding errors
     }
 
+    function sample_topp(probabilities, n, topp) {
+        // top-p sampling (or "nucleus sampling") samples from the smallest set of
+        // tokens that exceed probability topp. This way we never sample tokens that
+        // have very low probabilities and are less likely to go "off the rails".
+
+        // quicksort indices in descending order of probabilities
+        // values smaller than (1 - topp) / (n - 1) cannot be part of the result
+        // so for efficiency we crop these out as candidates before sorting
+        const cutoff = (1.0 - topp) / (n - 1);
+        let n0 = 0;
+        let probindex = [];
+        for (let i = 0; i < n; i++) {
+            if (probabilities[i] >= cutoff) {
+                probindex.push({index: i, prob: probabilities[i]});
+                n0++;
+            }
+        }
+        probindex.sort((a, b) => b.prob - a.prob);
+
+        // truncate the list where cumulative probability exceeds topp
+        let cumulative_prob = 0.0;
+        let last_idx = n0 - 1; // in case of rounding errors consider all elements
+        for (let i = 0; i < n0; i++) {
+            cumulative_prob += probindex[i].prob;
+            if (cumulative_prob > topp) {
+                last_idx = i;
+                break; // we've exceeded topp by including last_idx
+            }
+        }
+
+        // sample from the truncated list
+        const r = Math.random() * cumulative_prob;
+        let cdf = 0.0;
+        for (let i = 0; i <= last_idx; i++) {
+            cdf += probindex[i].prob;
+            if (r < cdf) {
+                return probindex[i].index;
+            }
+        }
+        return probindex[last_idx].index; // in case of rounding errors
+    }
+
     function argmax(v, n) {
         // return argmax of v in elements 0..n
         let max_i = 0;
@@ -408,6 +455,7 @@
         if (steps <= 0 || steps > config.seq_len) { steps = config.seq_len; }
         let next = 0;
         let token = 1; // 1 = BOS token in Llama-2 sentencepiece
+        let topp = parseFloat(document.querySelector('#top-p').value);
         document.querySelector('#output').value += "<s>\n"; // explicit print the initial BOS token (=1), stylistically symmetric
 
         const prompt = document.querySelector('#prompt').value;
@@ -437,7 +485,15 @@
                     // apply softmax to the logits to get the probabilities for next token
                     softmax(run_state.logits, config.vocab_size);
                     // we now want to sample from this distribution to get the next token
-                    next = sample(run_state.logits, config.vocab_size);
+                    //next = sample(run_state.logits, config.vocab_size);
+                    // we sample from this distribution to get the next token
+                    if (topp <= 0 || topp >= 1) {
+                        // simply sample from the predicted probability distribution
+                        next = sample(run_state.logits, config.vocab_size);
+                    } else {
+                        // top-p (nucleus) sampling, clamping the least likely tokens to zero
+                        next = sample_topp(run_state.logits, config.vocab_size, topp);
+                    }
                 }
                 await new Promise(resolve => setTimeout(resolve, 0));
                 // following BOS token (1), sentencepiece decoder strips any leading whitespace (see PR #89)
