@@ -4,6 +4,8 @@
   <img src="assets/llama2js.jpg" width="800" alt="llama2.js">
 </p>
 
+> A Fork of [llama2.js](https://github.com/epicure/llama2.js) rewritten to be usefull as a library and perhaps add some other functionalities in the future.
+
 A pure JavaScript port of Karpathy's [llama2.c](https://github.com/karpathy/llama2.c) with a simple UI.
 
 ## How to run
