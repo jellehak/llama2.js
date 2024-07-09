@@ -401,15 +401,22 @@ function argmax(v, n) {
     return max_i;
 }
 
-export async function generate() {
+/**
+ * 
+ * @param {*} param0 
+ * @returns 
+ */
+export async function *generator({
+    temperature = 1.0,
+    topp = 1.0,
+    steps = 100,
+    prompt = ''
+} = {}) {
     if (is_generating) {
         return;
     }
     is_generating = true;
-    document.querySelector('#output').value = '';
-    document.querySelector('#toks').textContent = '';
-    const temperature = parseFloat(document.querySelector('#temperature').value);
-    let steps = parseInt(document.querySelector('#steps').value);
+    
     let elpased = [];
 
     let pos = 0;
@@ -417,23 +424,23 @@ export async function generate() {
     if (steps <= 0 || steps > config.seq_len) { steps = config.seq_len; }
     let next = 0;
     let token = 1; // 1 = BOS token in Llama-2 sentencepiece
-    let topp = parseFloat(document.querySelector('#top-p').value);
-    document.querySelector('#output').value += "<s>\n"; // explicit print the initial BOS token (=1), stylistically symmetric
 
-    const prompt = document.querySelector('#prompt').value;
+    // const prompt = document.querySelector('#prompt').value;
     let num_prompt_tokens = 0;
     let prompt_tokens;
     if (prompt) {
         prompt_tokens = bpe_encode(prompt);
         num_prompt_tokens = prompt_tokens.length;
-        document.querySelector('#output').value += prompt;
+        // document.querySelector('#output').value += prompt;
     }
 
     while (pos < steps) {
         const start = performance.now();
         transformer(token, pos, config, run_state, weights);
 
-        if (pos < num_prompt_tokens) {
+        const isInputPrompt = pos < num_prompt_tokens;
+        if (isInputPrompt) {
+            // console.log('prompt', prompt_tokens[pos])
             // if we are still processing the input prompt, force the next prompt token
             next = prompt_tokens[pos];
         } else {
@@ -457,23 +464,24 @@ export async function generate() {
                     next = sample_topp(run_state.logits, config.vocab_size, topp);
                 }
             }
-            await new Promise(resolve => setTimeout(resolve, 0));
-            // following BOS token (1), sentencepiece decoder strips any leading whitespace (see PR #89)
-            if (token == 1 && vocab[next][0] == ' ') {
-                document.querySelector('#output').value += vocab[next].slice(1);
-            } else {
-                document.querySelector('#output').value += vocab[next];
-            }
         }
+        // Delay for 0ms to allow the UI to update
+        await new Promise(resolve => setTimeout(resolve, 0));
+
         // advance forward
         token = next;
         pos++;
         // report achieved tok/s
         const end = performance.now();
         elpased.push(1 / (end - start) * 1000);
-        document.querySelector('#toks').textContent = elpased.slice(-1)[0].toFixed(4);
+        yield {
+            isInputPrompt,
+            next: vocab[next], 
+            token, 
+            toks: elpased.slice(-1)[0] 
+        };
     }
     const avg = elpased.reduce((a, b) => a + b) / elpased.length;
-    document.querySelector('#toks').textContent = avg.toFixed(4);
     is_generating = false;
+    return {avg}
 }

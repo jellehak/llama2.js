@@ -15,11 +15,6 @@ A pure JavaScript port of Karpathy's [llama2.c](https://github.com/karpathy/llam
     wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories110M.bin
     ```
 2. Open run.html via a WebServer
-   
-   ```bash
-    python -m http.server 8080
-    open http://localhost:8080/run.html
-    ```
 
 ## Performance
 

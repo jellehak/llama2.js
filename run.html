@@ -4,60 +4,92 @@
 <!-- https://github.com/karpathy/llama2.c#notable-forks -->
 <title>llama2.js</title>
 <style>
-    body {
-        padding: 1em;
-    }
+  body {
+    padding: 1em;
+  }
 
-    label,
-    button {
-        margin: 0.5em;
-    }
+  label,
+  button {
+    margin: 0.5em;
+  }
 
-    input {
-        width: 5em;
-    }
+  input {
+    width: 5em;
+  }
 
-    textarea {
-        padding: 1em;
-    }
+  textarea {
+    padding: 1em;
+  }
 </style>
 
 <body>
+  <div>
     <div>
-        <div>
-            <textarea id="prompt" type="text" value="" cols="80" rows="1" placeholder="One day"></textarea>
-        </div>
-        <select id="model">
-            <option value="stories15m">stories15m</option>
-            <option value="stories42m">stories42m</option>
-            <option value="stories110m">stories110m</option>
-        </select>
-
-        <label>top-p</label><input id="top-p" type="number" value="1.0" step="0.1" />
-        <label>temperature</label><input id="temperature" type="number" value="0.9" step="0.1" />
-        <label>steps</label><input id="steps" type="number" value="100" />
-        <button id="run">run</button>
+      <textarea
+        id="prompt"
+        type="text"
+        value=""
+        cols="80"
+        rows="1"
+        placeholder="One day"
+      ></textarea>
     </div>
-    <textarea id="output" rows="20" cols="80"></textarea>
-    <p><span>achieved tok/s: </span><span id="toks"></span></p>
+    <select id="model">
+      <option value="stories15m">stories15m</option>
+      <option value="stories42m">stories42m</option>
+      <option value="stories110m">stories110m</option>
+    </select>
 
-    <script type="module">
-        import { load_model, load_vocab, generate } from './llama2.js';
+    <label>top-p</label
+    ><input id="top-p" type="number" value="1.0" step="0.1" />
+    <label>temperature</label
+    ><input id="temperature" type="number" value="0.9" step="0.1" />
+    <label>steps</label><input id="steps" type="number" value="100" />
+    <button id="run">run</button>
+  </div>
+  <textarea id="output" rows="20" cols="80"></textarea>
+  <p><span>achieved tok/s: </span><span id="toks"></span></p>
 
-        async function init() {
-            await load_model('models/stories15m.bin');
-            await load_vocab('tokenizer.bin');
+  <script type="module">
+    import { load_model, load_vocab, generator } from "./llama2.js";
 
-            generate();
+    async function init() {
+      await load_model("models/stories15m.bin");
+      await load_vocab("tokenizer.bin");
+
+      generate();
+    }
+
+    async function generate() {
+      document.querySelector("#output").value = "";
+      document.querySelector("#toks").textContent = "";
+
+      const iterator = await generator();
+      for await (const chunk of iterator) {
+        const { token, next } = chunk;
+        document.querySelector('#toks').textContent = chunk.toks.toFixed(4);
+        if (chunk.isInputPrompt) {
+          continue;
         }
 
-        document.querySelector('#run').addEventListener('click', generate);
-        // select another model
-        document.querySelector('#model').addEventListener('change', async function () {
-            await load_model(this.value + '.bin');
-            generate();
-        });
+        if (token == 1 && next[0] == " ") {
+          document.querySelector("#output").value += next.slice(1);
+        } else {
+          document.querySelector("#output").value += next;
+        }
+      }
+    }
 
-        init();
-    </script>
+    document.querySelector("#run").addEventListener("click", generate);
+
+    // select another model
+    document
+      .querySelector("#model")
+      .addEventListener("change", async function () {
+        await load_model(`models/${this.value}.bin`);
+        generate();
+      });
+
+    init();
+  </script>
 </body>
