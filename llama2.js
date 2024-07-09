@@ -79,7 +79,7 @@ export async function load_model(path) {
     };
 }
 
-async function load_vocab(path) {
+export async function load_vocab(path) {
     const response = await fetch(path);
     const arrayBuffer = await response.arrayBuffer();
 
