@@ -4,10 +4,12 @@
 let config, vocab, vocab_scores, weights, run_state;
 let is_generating = false;
 
-// ----------------------------------------------------------------------------
-// initialization: read from checkpoint
 
-export async function load_model(path) {
+/**
+ * initialization: read from checkpoint
+ * @param {*} path 
+ */
+export async function load_model(path = "") {
     const response = await fetch(path);
     const arrayBuffer = await response.arrayBuffer();
 
@@ -57,9 +59,8 @@ export async function load_model(path) {
         freq_cis_real: new Float32Array(arrayBuffer.slice(offset, offset += 4 * p.seq_len * head_size / 2)),
         freq_cis_imag: new Float32Array(arrayBuffer.slice(offset, offset += 4 * p.seq_len * head_size / 2)),
         // (optional) classifier weights for the logits, on the last layer
-        wcls: null,
+        wcls: shared_weights ? weights.token_embedding_table : offset,
     };
-    weights.wcls = shared_weights ? weights.token_embedding_table : offset;
 
     run_state = {
         // current wave of activations
@@ -88,7 +89,6 @@ export async function load_vocab(path) {
 
     vocab = [];
     vocab_scores = [];
-    const max_token_length = dataView.getInt32(offset, true);
     const decoder = new TextDecoder();
     offset += 4;
     for (let i = 0; i < config.vocab_size; i++) {
@@ -110,8 +110,14 @@ function accum(a, b, size) {
     }
 }
 
+/**
+ * calculate sum of squares
+ * @param {*} o 
+ * @param {*} x 
+ * @param {*} weight 
+ * @param {*} size 
+ */
 function rmsnorm(o, x, weight, size) {
-    // calculate sum of squares
     let ss = 0.0;
     for (let j = 0; j < size; j++) {
         ss += x[j] * x[j];
@@ -156,8 +162,15 @@ function matmul(xout, x, w, n, d) {
     }
 }
 
-function transformer(token, pos, p, s, w) {
-    // p = config, s = run_state, w = weights
+/**
+ * 
+ * @param {Number} token 
+ * @param {*} pos config
+ * @param {*} p 
+ * @param {*} s run_state
+ * @param {*} w weights
+ */
+function transformer(token = 0, pos, p, s, w) {
     // a few convenience variables
     let x = s.x;
     const dim = p.dim;
@@ -279,9 +292,11 @@ function transformer(token, pos, p, s, w) {
     matmul(s.logits, x, w.wcls, p.dim, p.vocab_size);
 }
 
-// ----------------------------------------------------------------------------
-// byte pair encoding (BPE) tokenizer, encodes strings into tokens so we can prompt
-
+/**
+ * byte pair encoding (BPE) tokenizer, encodes strings into tokens so we can prompt
+ * @param {*} text 
+ * @returns 
+ */
 function bpe_encode(text) {
 
     // a temporary buffer to merge two consecutive tokens
@@ -427,13 +442,9 @@ export async function *generator({
 
     // const prompt = document.querySelector('#prompt').value;
     let num_prompt_tokens = 0;
-    let prompt_tokens;
-    if (prompt) {
-        prompt_tokens = bpe_encode(prompt);
-        num_prompt_tokens = prompt_tokens.length;
-        // document.querySelector('#output').value += prompt;
-    }
-
+    const prompt_tokens = bpe_encode(prompt);
+    num_prompt_tokens = prompt_tokens.length;
+   
     while (pos < steps) {
         const start = performance.now();
         transformer(token, pos, config, run_state, weights);
@@ -443,27 +454,28 @@ export async function *generator({
             // console.log('prompt', prompt_tokens[pos])
             // if we are still processing the input prompt, force the next prompt token
             next = prompt_tokens[pos];
+            return;
+        }
+
+        // sample the next token
+        if (temperature == 0.0) {
+            // greedy argmax sampling
+            next = argmax(run_state.logits, config.vocab_size);
+            return;
+        }
+
+        // apply the temperature to the logits
+        for (let q = 0; q < config.vocab_size; q++) { run_state.logits[q] /= temperature; }
+        // apply softmax to the logits to get the probabilities for next token
+        softmax(run_state.logits, config.vocab_size);
+
+        // we now want to sample from this distribution to get the next token
+        if (topp <= 0 || topp >= 1) {
+            // simply sample from the predicted probability distribution
+            next = sample(run_state.logits, config.vocab_size);
         } else {
-            // sample the next token
-            if (temperature == 0.0) {
-                // greedy argmax sampling
-                next = argmax(run_state.logits, config.vocab_size);
-            } else {
-                // apply the temperature to the logits
-                for (let q = 0; q < config.vocab_size; q++) { run_state.logits[q] /= temperature; }
-                // apply softmax to the logits to get the probabilities for next token
-                softmax(run_state.logits, config.vocab_size);
-                // we now want to sample from this distribution to get the next token
-                //next = sample(run_state.logits, config.vocab_size);
-                // we sample from this distribution to get the next token
-                if (topp <= 0 || topp >= 1) {
-                    // simply sample from the predicted probability distribution
-                    next = sample(run_state.logits, config.vocab_size);
-                } else {
-                    // top-p (nucleus) sampling, clamping the least likely tokens to zero
-                    next = sample_topp(run_state.logits, config.vocab_size, topp);
-                }
-            }
+            // top-p (nucleus) sampling, clamping the least likely tokens to zero
+            next = sample_topp(run_state.logits, config.vocab_size, topp);
         }
         // Delay for 0ms to allow the UI to update
         await new Promise(resolve => setTimeout(resolve, 0));
