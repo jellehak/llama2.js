@@ -54,8 +54,8 @@
     import { load_model, load_vocab, generator } from "./llama2.js";
 
     async function init() {
-      await load_model("models/stories15m.bin");
-      await load_vocab("tokenizer.bin");
+      await load_model("./models/stories15m.bin");
+      await load_vocab("./tokenizer.bin");
 
       generate();
     }
@@ -86,7 +86,7 @@
     document
       .querySelector("#model")
       .addEventListener("change", async function () {
-        await load_model(`models/${this.value}.bin`);
+        await load_model(`./models/${this.value}.bin`);
         generate();
       });
 
