@@ -13,6 +13,14 @@ export async function load_model(path = "") {
     const response = await fetch(path);
     const arrayBuffer = await response.arrayBuffer();
 
+    readCheckpoint(arrayBuffer)
+}
+
+/**
+ * initialization: read from checkpoint
+ * @param {ArrayBuffer} arrayBuffer
+ */
+export async function readCheckpoint(arrayBuffer) {
     let offset = 0;
 
     config = {
@@ -59,8 +67,9 @@ export async function load_model(path = "") {
         freq_cis_real: new Float32Array(arrayBuffer.slice(offset, offset += 4 * p.seq_len * head_size / 2)),
         freq_cis_imag: new Float32Array(arrayBuffer.slice(offset, offset += 4 * p.seq_len * head_size / 2)),
         // (optional) classifier weights for the logits, on the last layer
-        wcls: shared_weights ? weights.token_embedding_table : offset,
+        wcls: null,
     };
+    weights.wcls = shared_weights ? weights.token_embedding_table : offset;
 
     run_state = {
         // current wave of activations
@@ -84,6 +93,10 @@ export async function load_vocab(path) {
     const response = await fetch(path);
     const arrayBuffer = await response.arrayBuffer();
 
+    loadVocab(arrayBuffer)
+}
+
+export async function loadVocab(arrayBuffer) {
     const dataView = new DataView(arrayBuffer);
     let offset = 0;
 
@@ -416,6 +429,41 @@ function argmax(v, n) {
     return max_i;
 }
 
+function step({isInputPrompt, prompt_tokens, pos, temperature, topp}) {
+    let next = 0
+
+    if (isInputPrompt) {
+        // if we are still processing the input prompt, force the next prompt token
+        next = prompt_tokens[pos];
+        return next;
+    }
+
+    // sample the next token
+    const isTemperatureZero = temperature == 0.0;
+    if (isTemperatureZero) {
+        // greedy argmax sampling
+        next = argmax(run_state.logits, config.vocab_size);
+        return next;
+    }
+
+    if(!isTemperatureZero) {
+        // apply the temperature to the logits
+        for (let q = 0; q < config.vocab_size; q++) { run_state.logits[q] /= temperature; }
+        // apply softmax to the logits to get the probabilities for next token
+        softmax(run_state.logits, config.vocab_size);
+
+        // we now want to sample from this distribution to get the next token
+        if (topp <= 0 || topp >= 1) {
+            // simply sample from the predicted probability distribution
+            next = sample(run_state.logits, config.vocab_size);
+        } else {
+            // top-p (nucleus) sampling, clamping the least likely tokens to zero
+            next = sample_topp(run_state.logits, config.vocab_size, topp);
+        }
+    }
+    return next;
+}
+
 /**
  * 
  * @param {*} param0 
@@ -450,33 +498,9 @@ export async function *generator({
         transformer(token, pos, config, run_state, weights);
 
         const isInputPrompt = pos < num_prompt_tokens;
-        if (isInputPrompt) {
-            // console.log('prompt', prompt_tokens[pos])
-            // if we are still processing the input prompt, force the next prompt token
-            next = prompt_tokens[pos];
-            return;
-        }
 
-        // sample the next token
-        if (temperature == 0.0) {
-            // greedy argmax sampling
-            next = argmax(run_state.logits, config.vocab_size);
-            return;
-        }
+        const next = step({isInputPrompt, prompt_tokens, pos, temperature, topp})
 
-        // apply the temperature to the logits
-        for (let q = 0; q < config.vocab_size; q++) { run_state.logits[q] /= temperature; }
-        // apply softmax to the logits to get the probabilities for next token
-        softmax(run_state.logits, config.vocab_size);
-
-        // we now want to sample from this distribution to get the next token
-        if (topp <= 0 || topp >= 1) {
-            // simply sample from the predicted probability distribution
-            next = sample(run_state.logits, config.vocab_size);
-        } else {
-            // top-p (nucleus) sampling, clamping the least likely tokens to zero
-            next = sample_topp(run_state.logits, config.vocab_size, topp);
-        }
         // Delay for 0ms to allow the UI to update
         await new Promise(resolve => setTimeout(resolve, 0));
 
