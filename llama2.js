@@ -488,7 +488,6 @@ export async function *generator({
     let next = 0;
     let token = 1; // 1 = BOS token in Llama-2 sentencepiece
 
-    // const prompt = document.querySelector('#prompt').value;
     let num_prompt_tokens = 0;
     const prompt_tokens = bpe_encode(prompt);
     num_prompt_tokens = prompt_tokens.length;
