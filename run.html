@@ -57,14 +57,19 @@
       await load_model("./models/stories15m.bin");
       await load_vocab("./tokenizer.bin");
 
-      generate();
+      // generate();
     }
 
     async function generate() {
       document.querySelector("#output").value = "";
       document.querySelector("#toks").textContent = "";
 
-      const iterator = await generator();
+      const iterator = await generator({
+        temperature: parseFloat(document.querySelector("#temperature").value),
+        prompt: document.querySelector("#prompt").value,
+        topp: parseFloat(document.querySelector("#top-p").value),
+        steps: parseInt(document.querySelector("#steps").value),
+      });
       for await (const chunk of iterator) {
         const { token, next } = chunk;
         document.querySelector('#toks').textContent = chunk.toks.toFixed(4);
@@ -72,11 +77,8 @@
           continue;
         }
 
-        if (token == 1 && next[0] == " ") {
-          document.querySelector("#output").value += next.slice(1);
-        } else {
-          document.querySelector("#output").value += next;
-        }
+        const value = token == 1 && next[0] == " " ? next.slice(1) : next;
+        document.querySelector("#output").value += value;
       }
     }
 
