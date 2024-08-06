@@ -18,14 +18,39 @@ wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories110M.bin
 ```
 2. Open run.html via a WebServer
 
-## Performance
 
-Tokens/sec measurement on Apple M1
+## Usage
+```js
+import { loadVocab, readCheckpoint, generator } from "llama2js"
+import * as process from 'process'
+import * as fs from 'fs'
 
-|    tok/s   | 15M | 42M | 110M |
-|-------|-----|-----|-----|
-| 🐢 |  ~30|   ~13   | ~5 |
+async function init() {
+    const model = fs.readFileSync('pathto/stories15m.bin')
+    readCheckpoint(model.buffer)
+    const tokenizer = fs.readFileSync('pathto/tokenizer.bin')
+    loadVocab(tokenizer.buffer)
 
+    generate()
+}
+
+async function generate() {
+    const iterator = await generator({
+        prompt: "Once upon a time, there was a"
+    })
+
+    while (true) {
+        const { value, done } = await iterator.next() 
+        if (done) {
+            console.log(value)
+            break
+        }
+        process.stdout.write(value.next)
+    }
+}
+
+init()
+```
 
 ## License
 MIT

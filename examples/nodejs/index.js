@@ -1,4 +1,4 @@
-import { load_model, load_vocab, loadVocab, readCheckpoint, generator } from "../../llama2.js"
+import { loadVocab, readCheckpoint, generator } from "../../llama2.js"
 import * as process from 'process'
 import * as fs from 'fs'
 

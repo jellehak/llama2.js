@@ -23,75 +23,81 @@
 </style>
 
 <body>
-  <div>
+  <div id="app">
     <div>
-      <textarea
-        id="prompt"
-        type="text"
-        value=""
-        cols="80"
-        rows="1"
-        placeholder="One day"
-      ></textarea>
+      <textarea v-model="state.prompt" cols="80" rows="1" placeholder="One day"></textarea>
     </div>
-    <select id="model">
-      <option value="stories15m">stories15m</option>
-      <option value="stories42m">stories42m</option>
-      <option value="stories110m">stories110m</option>
-    </select>
-
-    <label>top-p</label
-    ><input id="top-p" type="number" value="1.0" step="0.1" />
-    <label>temperature</label
-    ><input id="temperature" type="number" value="0.9" step="0.1" />
-    <label>steps</label><input id="steps" type="number" value="100" />
-    <button id="run">run</button>
+    
+    <div>
+      <select v-model="state.model">
+        <option value="stories15m">stories15m</option>
+        <option value="stories42m">stories42m</option>
+        <option value="stories110m">stories110m</option>
+      </select>
+      <label>top-p</label><input v-model.number="state.topP" type="number" step="0.1" />
+      <label>temperature</label><input v-model.number="state.temperature" type="number" step="0.1" />
+      <label>steps</label><input v-model.number="state.steps" type="number" />
+      <button @click="generate">run</button>
+    </div>
+    <textarea id="output" rows="20" cols="80" v-model="state.output"></textarea>
+    <p><span>achieved tok/s: </span><span id="toks">{{ state.toks }}</span></p>
   </div>
-  <textarea id="output" rows="20" cols="80"></textarea>
-  <p><span>achieved tok/s: </span><span id="toks"></span></p>
 
   <script type="module">
+    import { createApp, reactive } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
     import { load_model, load_vocab, generator } from "./llama2.js";
 
-    async function init() {
-      await load_model("./models/stories15m.bin");
-      await load_vocab("./tokenizer.bin");
+    const app = createApp({
+      setup() {
+        const state = reactive({
+          prompt: "",
+          model: "stories15m",
+          topP: 1.0,
+          temperature: 0.9,
+          steps: 100,
+          output: "",
+          toks: 0
+        });
 
-      // generate();
-    }
+        async function generate() {
+          state.output = "";
+          state.toks = 0;
 
-    async function generate() {
-      document.querySelector("#output").value = "";
-      document.querySelector("#toks").textContent = "";
+          const iterator = await generator({
+            temperature: parseFloat(state.temperature),
+            prompt: state.prompt,
+            topp: parseFloat(state.topP),
+            steps: parseInt(state.steps),
+          });
 
-      const iterator = await generator({
-        temperature: parseFloat(document.querySelector("#temperature").value),
-        prompt: document.querySelector("#prompt").value,
-        topp: parseFloat(document.querySelector("#top-p").value),
-        steps: parseInt(document.querySelector("#steps").value),
-      });
-      for await (const chunk of iterator) {
-        const { token, next } = chunk;
-        document.querySelector('#toks').textContent = chunk.toks.toFixed(4);
-        if (chunk.isInputPrompt) {
-          continue;
+          while (true) {
+            const { value, done } = await iterator.next();
+            if (done) {
+              console.log(value);
+              break;
+            }
+            state.toks = value.toks.toFixed(4);
+            state.output += value.next;
+          }
         }
 
-        const value = token == 1 && next[0] == " " ? next.slice(1) : next;
-        document.querySelector("#output").value += value;
-      }
-    }
+        async function loadModel() {
+          await load_model("./models/stories15m.bin");
+          // await load_model("https://huggingface.co/karpathy/tinyllamas/resolve/main/stories15M.bin");
+          await load_vocab("./tokenizer.bin");
+        }
 
-    document.querySelector("#run").addEventListener("click", generate);
+        return {
+          state,
+          generate,
+          loadModel,
+        };
+      },
+      mounted() {
+        this.loadModel();
+      },
+    });
 
-    // select another model
-    document
-      .querySelector("#model")
-      .addEventListener("change", async function () {
-        await load_model(`./models/${this.value}.bin`);
-        generate();
-      });
-
-    init();
+    app.mount("#app");
   </script>
 </body>

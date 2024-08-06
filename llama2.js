@@ -485,7 +485,6 @@ export async function *generator({
     let pos = 0;
     // right now we cannot run for more than p.seq_len steps
     if (steps <= 0 || steps > config.seq_len) { steps = config.seq_len; }
-    let next = 0;
     let token = 1; // 1 = BOS token in Llama-2 sentencepiece
 
     let num_prompt_tokens = 0;
