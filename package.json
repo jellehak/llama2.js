@@ -1,0 +1,16 @@
+{
+  "name": "llama2",
+  "version": "1.0.0",
+  "description": "Inference Llama 2 in pure JavaScript(HTML)",
+  "main": "llama2.js",
+  "directories": {
+    "example": "examples"
+  },
+  "type":"module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
