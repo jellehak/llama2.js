@@ -11,11 +11,11 @@ A pure JavaScript port of Karpathy's [llama2.c](https://github.com/karpathy/llam
 ## How to run
 1. Download Karpathy's Llama2 ([Orig instructions](https://github.com/karpathy/llama2.c#feel-the-magic)) parameters pretrained on [TinyStories](https://huggingface.co/datasets/roneneldan/TinyStories) dataset 
 
-    ```bash
-    wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories15M.bin
-    wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories42M.bin
-    wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories110M.bin
-    ```
+```bash
+wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories15M.bin
+wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories42M.bin
+wget https://huggingface.co/karpathy/tinyllamas/resolve/main/stories110M.bin
+```
 2. Open run.html via a WebServer
 
 ## Performance
