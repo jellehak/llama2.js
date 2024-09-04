@@ -1,4 +1,4 @@
-## llama2.js
+# llama2.js [![npm](https://img.shields.io/npm/v/llama2js.svg)](https://www.npmjs.com/package/llama2js)
 
 <p align="center">
   <img src="assets/llama2js.jpg" width="800" alt="llama2.js">
